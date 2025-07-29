@@ -118,56 +118,56 @@ const Index = () => {
       results: 19.73,
       moneySpent: 5623.63,
       roas1: 3.12,
-      endDate: "$0.00",
+      endDate: "$17534.52",
       shoppingValue: 17534.52,
     },
     {
       results: 23.62,
       moneySpent: 6234.45,
       roas1: 2.26,
-      endDate: "$0.00",
+      endDate: "$14067.25",
       shoppingValue: 14067.25,
     },
     {
       results: 70.21,
       moneySpent: 6367.21,
       roas1: 3.03,
-      endDate: "$0.00",
+      endDate: "$19305.36",
       shoppingValue: 19305.36,
     },
     {
       results: 14.92,
       moneySpent: 117267.32,
       roas1: 3.41,
-      endDate: "$0.00",
+      endDate: "$399300.60",
       shoppingValue: 399300.6,
     },
     {
       results: 26.47,
       moneySpent: 846.98,
       roas1: 2.1,
-      endDate: "$0.00",
+      endDate: "$1777.48",
       shoppingValue: 1777.48,
     },
     {
       results: 29.67,
       moneySpent: 667.09,
       roas1: 4.58,
-      endDate: "$0.00",
+      endDate: "$3055.78",
       shoppingValue: 3055.78,
     },
     {
       results: 29.01,
       moneySpent: 754.24,
       roas1: 2.2,
-      endDate: "$0.00",
+      endDate: "$1657.68",
       shoppingValue: 1657.68,
     },
     {
       results: 29.54,
       moneySpent: 21298.49,
       roas1: 1.82,
-      endDate: "$0.00",
+      endDate: "$38860.85",
       shoppingValue: 38860.85,
     },
   ];
@@ -176,7 +176,7 @@ const Index = () => {
   const [columns, setColumns] = useState([
     { label: "Amount spent", key: "moneySpent" },
     { label: "Purchase ROAS (return on ad spend)", key: "roas1" },
-    { label: "Purchases conversion value", key: "endDate" },
+    { label: "Purchases conversion value", key: "endDate", currencySymbol: "$" },
     { label: "Results", key: "results" },
     { label: "Cost per result", key: "shoppingValue" },
   ]);
@@ -188,6 +188,7 @@ const Index = () => {
   const [isMiniTextModalOpen, setIsMiniTextModalOpen] = useState(false);
   const [miniText, setMiniText] = useState("");
   const [selectedColumns, setSelectedColumns] = useState([]);
+  const [customCurrency, setCustomCurrency] = useState("");
   const moveColumn = (fromIndex, toIndex) => {
     const updatedColumns = [...columns];
     const [movedColumn] = updatedColumns.splice(fromIndex, 1);
@@ -247,12 +248,36 @@ const Index = () => {
 
   const handleChange = (e, rowIndex, columnKey) => {
     const updatedData = [...tableData];
-    updatedData[rowIndex][columnKey] = e.target.value;
+    let value = e.target.value;
+    
+    // If this is the endDate column (Purchases conversion value), ensure it has the correct currency symbol
+    if (columnKey === "endDate") {
+      const column = columns.find(col => col.key === "endDate");
+      const currencySymbol = column?.currencySymbol || "$";
+      
+      // If the value doesn't already have a currency symbol and it's not empty, add it
+      if (value && !/[^\d.]/.test(value)) {
+        // If it's a number or starts with a number, add the currency symbol
+        if (!isNaN(parseFloat(value))) {
+          value = `${currencySymbol}${value}`;
+        }
+      } else if (value) {
+        // Replace any existing currency symbol with the current one
+        // Extract the numeric part
+        const numericValue = value.replace(/[^0-9.]/g, "");
+        if (numericValue) {
+          value = `${currencySymbol}${numericValue}`;
+        }
+      }
+    }
+    
+    updatedData[rowIndex][columnKey] = value;
     setTableData(updatedData);
   };
 
   const calculateTotals = () => {
     const hasDollarSign = {};
+    const currencySymbols = {};
     let totalAmountSpent = 0;
     let totalPurchasesConversion = 0;
     let totalResults = 0;
@@ -260,8 +285,9 @@ const Index = () => {
     const totals = columns.reduce((totals, column) => {
       const key = column.key;
       let total = 0;
-      let dollarDetected = false;
-
+      let hasCurrency = false;
+      let currencySymbol = column.currencySymbol || "$"; // Default currency symbol
+      
       for (const row of tableData) {
         const value = row[key];
         let numericValue = 0;
@@ -269,7 +295,8 @@ const Index = () => {
         if (typeof value === "number") {
           numericValue = value;
         } else if (typeof value === "string") {
-          if (value.includes("$")) dollarDetected = true;
+          // Check if the string has any non-numeric characters (likely a currency symbol)
+          if (/[^\d.]/.test(value)) hasCurrency = true;
           const cleaned = value.replace(/[^0-9.]/g, "");
           numericValue = parseFloat(cleaned) || 0;
         }
@@ -277,11 +304,13 @@ const Index = () => {
         total += numericValue;
       }
 
-      hasDollarSign[key] = dollarDetected;
+      hasDollarSign[key] = hasCurrency;
+      currencySymbols[key] = currencySymbol;
 
       const capitalizedKey = key.charAt(0).toUpperCase() + key.slice(1);
       totals[`total${capitalizedKey}`] = total;
-      totals[`hasDollar-${key}`] = dollarDetected;
+      totals[`hasDollar-${key}`] = hasCurrency;
+      totals[`currencySymbol-${key}`] = currencySymbol;
       totals[`isAverage-${key}`] = false;
 
       // Track totals needed for derived values
@@ -348,6 +377,53 @@ const Index = () => {
     );
   };
 
+  const toggleCurrencySymbol = (columnKey, customSymbol = null) => {
+    setColumns(prevColumns => 
+      prevColumns.map(column => {
+        if (column.key === columnKey) {
+          let newSymbol;
+          
+          if (customSymbol) {
+            // Use the custom symbol provided
+            newSymbol = customSymbol;
+          } else {
+            // Toggle between $ and ₹
+            newSymbol = column.currencySymbol === "$" ? "₹" : "$";
+          }
+          
+          return { ...column, currencySymbol: newSymbol };
+        }
+        return column;
+      })
+    );
+    
+    // Update the table data to reflect the new currency symbol
+    setTableData(prevData => 
+      prevData.map(row => {
+        const updatedRow = { ...row };
+        if (updatedRow[columnKey] && typeof updatedRow[columnKey] === 'string') {
+          // Extract the numeric part
+          const numericValue = updatedRow[columnKey].replace(/[^0-9.]/g, "");
+          if (numericValue) {
+            // Apply the new currency symbol
+            const column = columns.find(col => col.key === columnKey);
+            let newSymbol = customSymbol;
+            if (!newSymbol) {
+              newSymbol = column.currencySymbol === "$" ? "₹" : "$";
+            }
+            updatedRow[columnKey] = `${newSymbol}${numericValue}`;
+          }
+        }
+        return updatedRow;
+      })
+    );
+    
+    // Reset the custom currency input after applying
+    if (customSymbol) {
+      setCustomCurrency("");
+    }
+  };
+
   useEffect(() => {
     const newWidths = {};
     for (const key in textRefs.current) {
@@ -382,7 +458,20 @@ const Index = () => {
       const { data } = await res.json();
       if (data) {
         setTableData(data.tableData || []);
-        setColumns(data.columns || []);
+        
+        // Ensure columns have the currencySymbol property if they're loaded from the database
+        if (data.columns) {
+          const updatedColumns = data.columns.map(column => {
+            if (column.key === "endDate" && !column.hasOwnProperty("currencySymbol")) {
+              return { ...column, currencySymbol: "$" };
+            }
+            return column;
+          });
+          setColumns(updatedColumns);
+        } else {
+          setColumns(columns);
+        }
+        
         setManuallyUnderlined(data.manuallyUnderlined || {});
         setEditableText(data.editableText || {});
       }
@@ -392,6 +481,10 @@ const Index = () => {
     fetchData();
   }, []);
   const autoFillCalculatedColumns = () => {
+    // Find the currency symbol for the endDate column
+    const endDateColumn = columns.find(col => col.key === "endDate");
+    const currencySymbol = endDateColumn?.currencySymbol || "$";
+    
     const updatedData = tableData.map((row) => {
       const parseNumber = (value) => {
         if (typeof value === "string") {
@@ -418,10 +511,20 @@ const Index = () => {
           ? parseFloat((purchasesConversion / amountSpent).toFixed(2))
           : "";
 
+      // Format the endDate value with the current currency symbol
+      const formattedEndDate = row.endDate ? 
+        (typeof row.endDate === 'string' && /[^\d.]/.test(row.endDate)) ?
+          // If it has any non-numeric characters (likely a currency symbol)
+          // Replace with the current currency symbol + the numeric value
+          `${currencySymbol}${parseNumber(row.endDate).toFixed(2)}` :
+          `${currencySymbol}${parseNumber(row.endDate).toFixed(2)}` :
+        `${currencySymbol}0.00`;
+
       return {
         ...row,
         shoppingValue: costPerResult,
         roas1: roas,
+        endDate: formattedEndDate
       };
     });
 
@@ -466,6 +569,37 @@ const Index = () => {
             onClick={() => setIsMiniTextModalOpen(true)}
           >
             Add Mini Text
+          </button>
+        </div>
+
+        {/* <div className="mb-4">
+          <button
+            className="btn btn-info"
+            onClick={() => toggleCurrencySymbol("endDate")}
+          >
+            Toggle Currency: {columns.find(col => col.key === "endDate")?.currencySymbol || "$"} 
+            {columns.find(col => col.key === "endDate")?.currencySymbol === "$" ? "→₹" : "→$"}
+          </button>
+        </div> */}
+
+        <div className="mb-4 d-flex align-items-center">
+          <input
+            type="text"
+            value={customCurrency}
+            onChange={(e) => setCustomCurrency(e.target.value)}
+            placeholder="Enter custom currency symbol"
+            style={{ marginRight: "10px" }}
+            maxLength="3"
+          />
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              if (customCurrency.trim()) {
+                toggleCurrencySymbol("endDate", customCurrency.trim());
+              }
+            }}
+          >
+            Apply Custom Currency
           </button>
         </div>
 
@@ -542,49 +676,51 @@ const Index = () => {
                         >
                           {/* Text with underline */}
                           {isEditing &&
-isEditing.rowIndex === rowIndex &&
-isEditing.columnKey === column.key ? (
-  <input
-    type="text"
-    value={row[column.key]}
-    onChange={(e) =>
-      handleChange(e, rowIndex, column.key)
-    }
-    onBlur={() => setIsEditing(null)}
-    autoFocus
-    style={{
-      border: "none",
-      background: "transparent",
-      textAlign: "right",
-      fontWeight: 600,
-      fontSize: "1rem",
-    }}
-  />
-) : (
-  <span
-    ref={(el) =>
-      (textRefs.current[`${rowIndex}-${column.key}`] = el)
-    }
-    onDoubleClick={() =>
-      handleDoubleClick(rowIndex, column.key)
-    }
-    style={{
-      position: "relative",
-      display: "inline-block",
-      fontWeight: 450,
-      cursor: "pointer",
-      textDecoration:
-        (underlinedText?.rowIndex === rowIndex &&
-          underlinedText?.columnKey === column.key) ||
-        manuallyUnderlined[`${rowIndex}-${column.key}`]
-          ? "underline dotted"
-          : "none",
-    }}
-  >
-    {row[column.key] || "–"}
-  </span>
-)}
-
+                          isEditing.rowIndex === rowIndex &&
+                          isEditing.columnKey === column.key ? (
+                            <input
+                              type="text"
+                              value={row[column.key]}
+                              onChange={(e) =>
+                                handleChange(e, rowIndex, column.key)
+                              }
+                              onBlur={() => setIsEditing(null)}
+                              autoFocus
+                              style={{
+                                border: "none",
+                                background: "transparent",
+                                textAlign: "right",
+                                fontWeight: 600,
+                                fontSize: "1rem",
+                              }}
+                            />
+                          ) : (
+                            <span
+                              ref={(el) =>
+                                (textRefs.current[`${rowIndex}-${column.key}`] =
+                                  el)
+                              }
+                              onDoubleClick={() =>
+                                handleDoubleClick(rowIndex, column.key)
+                              }
+                              style={{
+                                position: "relative",
+                                display: "inline-block",
+                                fontWeight: 450,
+                                cursor: "pointer",
+                                textDecoration:
+                                  (underlinedText?.rowIndex === rowIndex &&
+                                    underlinedText?.columnKey === column.key) ||
+                                  manuallyUnderlined[
+                                    `${rowIndex}-${column.key}`
+                                  ]
+                                    ? "underline dotted"
+                                    : "none",
+                              }}
+                            >
+                              {row[column.key] || "–"}
+                            </span>
+                          )}
 
                           {underlinedText?.rowIndex === rowIndex &&
                             underlinedText?.columnKey === column.key && (
@@ -710,45 +846,58 @@ isEditing.columnKey === column.key ? (
                     onMouseLeave={() => setUnderlinedText(null)}
                   >
                     <div style={{ display: "flex", flexDirection: "column" }}>
-                  <span
-  style={{
-    position: "relative",
-    display: "inline-block",
-    textAlign: "right",
-    fontWeight: 800,
-    fontSize: "23px",
-    textDecoration:
-      (underlinedText?.rowIndex === "total" &&
-        underlinedText?.columnKey === column.key) ||
-      manuallyUnderlined[`total-${column.key}`]
-        ? "underline dotted"
-        : "none",
-  }}
->
-  <span
-    ref={(el) => (textRefs.current[`total-${column.key}`] = el)}
-    style={{ display: "inline" }}
-  >
-    {(() => {
-      const totalKey =
-        `total${column.key.charAt(0).toUpperCase() + column.key.slice(1)}`;
-      const isAverage = totals[`isAverage-${column.key}`];
-      const value = totals[totalKey];
+                      <span
+                        style={{
+                          position: "relative",
+                          display: "inline-block",
+                          textAlign: "right",
+                          fontWeight: 800,
+                          fontSize: "23px",
+                          textDecoration:
+                            (underlinedText?.rowIndex === "total" &&
+                              underlinedText?.columnKey === column.key) ||
+                            manuallyUnderlined[`total-${column.key}`]
+                              ? "underline dotted"
+                              : "none",
+                        }}
+                      >
+                        <span
+                          ref={(el) =>
+                            (textRefs.current[`total-${column.key}`] = el)
+                          }
+                          style={{ display: "inline" }}
+                        >
+                          {(() => {
+                            const totalKey = `total${
+                              column.key.charAt(0).toUpperCase() +
+                              column.key.slice(1)
+                            }`;
+                            const isAverage = totals[`isAverage-${column.key}`];
+                            const value = totals[totalKey];
 
-      if (value === undefined || value === null) return " ";
+                            if (value === undefined || value === null)
+                              return " ";
 
-      const formattedValue = value.toLocaleString("en-US", {
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      });
+                            const formattedValue = value.toLocaleString(
+                              "en-US",
+                              {
+                                minimumFractionDigits: 2,
+                                maximumFractionDigits: 2,
+                              }
+                            );
 
-      const dollarPrefix = totals[`hasDollar-${column.key}`] ? "$" : "";
+                            const dollarPrefix = totals[
+                              `hasDollar-${column.key}`
+                            ]
+                              ? totals[`currencySymbol-${column.key}`] || "$"
+                              : "";
 
-      return `${isAverage ? "" : ""}${dollarPrefix}${formattedValue}`;
-    })()}
-  </span>
-</span>
-
+                            return `${
+                              isAverage ? "" : ""
+                            }${dollarPrefix}${formattedValue}`;
+                          })()}
+                        </span>
+                      </span>
 
                       <div>
                         <input
