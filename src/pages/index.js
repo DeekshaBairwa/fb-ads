@@ -178,7 +178,7 @@ const Index = () => {
     { label: "Purchase ROAS (return on ad spend)", key: "roas1" },
     { label: "Purchases conversion value", key: "endDate", currencySymbol: "$" },
     { label: "Results", key: "results" },
-    { label: "Cost per result", key: "shoppingValue" },
+    { label: "Cost per result", key: "shoppingValue", currencySymbol: "$" },
   ]);
   const [underlinedText, setUnderlinedText] = useState({});
   const [manuallyUnderlined, setManuallyUnderlined] = useState({});
@@ -582,6 +582,7 @@ const Index = () => {
             onClick={() => {
               if (customCurrency.trim()) {
                 toggleCurrencySymbol("endDate", customCurrency.trim());
+                toggleCurrencySymbol("shoppingValue", customCurrency.trim());
               }
             }}
           >
