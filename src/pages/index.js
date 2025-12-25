@@ -276,8 +276,6 @@ const Index = () => {
   };
 
   const calculateTotals = () => {
-    const hasDollarSign = {};
-    const currencySymbols = {};
     let totalAmountSpent = 0;
     let totalPurchasesConversion = 0;
     let totalResults = 0;
@@ -285,8 +283,6 @@ const Index = () => {
     const totals = columns.reduce((totals, column) => {
       const key = column.key;
       let total = 0;
-      let hasCurrency = false;
-      let currencySymbol = column.currencySymbol || "$"; // Default currency symbol
 
       for (const row of tableData) {
         const value = row[key];
@@ -295,8 +291,6 @@ const Index = () => {
         if (typeof value === "number") {
           numericValue = value;
         } else if (typeof value === "string") {
-          // Check if the string has any non-numeric characters (likely a currency symbol)
-          if (/[^\d.]/.test(value)) hasCurrency = true;
           const cleaned = value.replace(/[^0-9.]/g, "");
           numericValue = parseFloat(cleaned) || 0;
         }
@@ -304,16 +298,12 @@ const Index = () => {
         total += numericValue;
       }
 
-      hasDollarSign[key] = hasCurrency;
-      currencySymbols[key] = currencySymbol;
+      const capitalizedKey =
+        key.charAt(0).toUpperCase() + key.slice(1);
 
-      const capitalizedKey = key.charAt(0).toUpperCase() + key.slice(1);
       totals[`total${capitalizedKey}`] = total;
-      totals[`hasDollar-${key}`] = hasCurrency;
-      totals[`currencySymbol-${key}`] = currencySymbol;
       totals[`isAverage-${key}`] = false;
 
-      // Track totals needed for derived values
       if (key === "moneySpent") totalAmountSpent = total;
       if (key === "endDate") totalPurchasesConversion = total;
       if (key === "results") totalResults = total;
@@ -321,23 +311,21 @@ const Index = () => {
       return totals;
     }, {});
 
-    // ROAS (Purchase ROAS) = endDate / moneySpent
-    const derivedRoas =
-      totalAmountSpent > 0 ? totalPurchasesConversion / totalAmountSpent : 0;
-
-    totals["totalRoas1"] = derivedRoas;
+    // ROAS
+    totals.totalRoas1 =
+      totalAmountSpent > 0
+        ? totalPurchasesConversion / totalAmountSpent
+        : 0;
     totals["isAverage-roas1"] = true;
 
-    // Cost per Result = moneySpent / results
-    const costPerResultAverage =
+    // Cost per result
+    totals.totalShoppingValue =
       totalResults > 0 ? totalAmountSpent / totalResults : 0;
-
-    // Store in shoppingValue (since that's the key for Cost per result)
-    totals["totalShoppingValue"] = costPerResultAverage;
     totals["isAverage-shoppingValue"] = true;
 
     return totals;
   };
+
 
   const totals = calculateTotals();
   const toggleColumnSelection = (key) => {
@@ -384,10 +372,8 @@ const Index = () => {
           let newSymbol;
 
           if (customSymbol) {
-            // Use the custom symbol provided
             newSymbol = customSymbol;
           } else {
-            // Toggle between $ and ₹
             newSymbol = column.currencySymbol === "$" ? "₹" : "$";
           }
 
@@ -885,14 +871,13 @@ const Index = () => {
                               }
                             );
 
-                            const dollarPrefix = totals[
-                              `hasDollar-${column.key}`
-                            ]
-                              ? totals[`currencySymbol-${column.key}`] || "$"
-                              : "";
+                            const currencyPrefix =
+                              column.key === "endDate" || column.key === "shoppingValue"
+                                ? column.currencySymbol || "₹"
+                                : "";
 
                             return `${isAverage ? "" : ""
-                              }${dollarPrefix}${formattedValue}`;
+                              }${currencyPrefix}${formattedValue}`;
                           })()}
                         </span>
                       </span>
